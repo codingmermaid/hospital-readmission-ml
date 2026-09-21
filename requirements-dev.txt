@@ -1,0 +1,4 @@
+# Development and CI dependencies. Runtime deps live in requirements.txt.
+pytest>=7.4
+ruff>=0.6
+matplotlib>=3.7

@@ -1,10 +1,20 @@
-import pandas as pd
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 
-df = pd.read_csv('data/diabetic_data.csv')
+from src.io import read_pipeline_csv
+
+# NB: read_pipeline_csv, not pd.read_csv. pandas treats the literal string
+# "None" as missing by default, which would destroy the "not tested" level of
+# A1Cresult and max_glu_serum before we ever get to look at it. See src/io.py.
+df = read_pipeline_csv('data/diabetic_data.csv')
 print("Starting shape:", df.shape)
 
-# Replace '?' with NaN across the board for proper missing-value handling
+# '?' is this dataset's missing marker; read_pipeline_csv already maps it to
+# NaN, and this keeps the intent explicit for anyone reading the pipeline.
 df = df.replace('?', np.nan)
 
 # --- Drop encounters where discharge was to hospice or patient died ---

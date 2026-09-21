@@ -1,36 +1,39 @@
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import GroupShuffleSplit
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (roc_auc_score, precision_score, recall_score, f1_score,
-                               confusion_matrix, classification_report, roc_curve)
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import joblib
+import numpy as np
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+                               classification_report,
+                               confusion_matrix,
+                               f1_score,
+                               precision_score,
+                               recall_score,
+                               roc_auc_score,
+)
+from sklearn.model_selection import GroupShuffleSplit
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-df = pd.read_csv('data/diabetic_data_features.csv')
+from src.features import DROP_FOR_MODEL, GROUP_COL, MED_COLS, TARGET
+from src.io import read_pipeline_csv
 
-# --- Select features for modeling ---
-# Drop identifiers, leakage-prone/redundant columns, and raw versions replaced by engineered features
-drop_for_model = [
-    'encounter_id', 'patient_nbr', 'readmitted',  # identifiers + original 3-class target
-    'age',  # replaced by age_midpoint
-    'diag_1', 'diag_2', 'diag_3',  # replaced by diag_1_category (diag_2/3 dropped for now, high cardinality)
-    'number_diagnoses',  # replaced by capped version
-]
-med_cols = ['metformin', 'repaglinide', 'nateglinide', 'chlorpropamide', 'glimepiride',
-            'acetohexamide', 'glipizide', 'glyburide', 'tolbutamide', 'pioglitazone',
-            'rosiglitazone', 'acarbose', 'miglitol', 'troglitazone', 'tolazamide',
-            'insulin', 'glyburide-metformin', 'glipizide-metformin', 'glimepiride-pioglitazone',
-            'metformin-rosiglitazone', 'metformin-pioglitazone', 'examide', 'citoglipton']
-med_cols = [c for c in med_cols if c in df.columns]
-# individual med columns are summarized by num_med_changes; drop raw versions to avoid 20+ sparse dummies
+df = read_pipeline_csv('data/diabetic_data_features.csv')
+
+# Feature selection now comes from src/features.py, which is the single place
+# these lists are defined; they used to be duplicated verbatim here and in
+# lightgbm_model.py, with nothing checking the two stayed in sync.
+drop_for_model = list(DROP_FOR_MODEL)
+med_cols = [c for c in MED_COLS if c in df.columns]
 drop_for_model += med_cols
 
-X = df.drop(columns=drop_for_model + ['readmitted_30d'])
-y = df['readmitted_30d']
-groups = df['patient_nbr']
+X = df.drop(columns=drop_for_model + [TARGET])
+y = df[TARGET]
+groups = df[GROUP_COL]
 
 categorical_cols = X.select_dtypes(include=['object']).columns.tolist()
 numeric_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()

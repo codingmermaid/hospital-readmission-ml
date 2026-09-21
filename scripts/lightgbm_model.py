@@ -1,32 +1,45 @@
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import GroupShuffleSplit
-from sklearn.metrics import (roc_auc_score, precision_score, recall_score, f1_score,
-                               confusion_matrix, classification_report, precision_recall_curve)
-import lightgbm as lgb
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import joblib
+import lightgbm as lgb
+import numpy as np
+import pandas as pd
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_recall_curve,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import GroupShuffleSplit
 
-df = pd.read_csv('data/diabetic_data_features.csv')
+from src.features import CATEGORICAL_COLS, DROP_FOR_MODEL, FEATURE_ORDER, GROUP_COL, MED_COLS, TARGET
+from src.io import read_pipeline_csv
 
-drop_for_model = [
-    'encounter_id', 'patient_nbr', 'readmitted',
-    'age',
-    'diag_1', 'diag_2', 'diag_3',
-    'number_diagnoses',
-]
-med_cols = ['metformin', 'repaglinide', 'nateglinide', 'chlorpropamide', 'glimepiride',
-            'acetohexamide', 'glipizide', 'glyburide', 'tolbutamide', 'pioglitazone',
-            'rosiglitazone', 'acarbose', 'miglitol', 'troglitazone', 'tolazamide',
-            'insulin', 'glyburide-metformin', 'glipizide-metformin', 'glimepiride-pioglitazone',
-            'metformin-rosiglitazone', 'metformin-pioglitazone', 'examide', 'citoglipton']
-med_cols = [c for c in med_cols if c in df.columns]
+MODEL_DIR = 'model'
+
+df = read_pipeline_csv('data/diabetic_data_features.csv')
+
+# Shared with baseline_model.py via src/features.py.
+drop_for_model = list(DROP_FOR_MODEL)
+med_cols = [c for c in MED_COLS if c in df.columns]
 drop_for_model += med_cols
 
-X = df.drop(columns=drop_for_model + ['readmitted_30d'])
-y = df['readmitted_30d']
-groups = df['patient_nbr']
+X = df.drop(columns=drop_for_model + [TARGET])
+y = df[TARGET]
+groups = df[GROUP_COL]
 
-categorical_cols = X.select_dtypes(include=['str', 'object']).columns.tolist()
+# Pin the column order and the categorical set rather than inferring them from
+# dtypes. LightGBM matches features positionally at predict time, so if this
+# order ever differs from what app.py builds, every prediction is silently
+# wrong instead of raising. tests/test_model_contract.py asserts they agree.
+X = X[FEATURE_ORDER]
+categorical_cols = list(CATEGORICAL_COLS)
 for col in categorical_cols:
     X[col] = X[col].astype('category')
 
@@ -87,7 +100,11 @@ print("\n=== Feature importance (top 15) ===")
 importance = pd.Series(model.feature_importances_, index=X.columns).sort_values(ascending=False)
 print(importance.head(15))
 
-joblib.dump(model, 'lightgbm_model.joblib')
-joblib.dump(categorical_cols, 'categorical_cols.joblib')
-joblib.dump(chosen_threshold, 'lightgbm_threshold.joblib')
-print("\nSaved LightGBM model + threshold")
+# These used to be written to the repo root while app.py loaded them from
+# model/, so a retrain appeared to succeed without changing what the app served.
+os.makedirs(MODEL_DIR, exist_ok=True)
+joblib.dump(model, os.path.join(MODEL_DIR, 'lightgbm_model.joblib'))
+joblib.dump(categorical_cols, os.path.join(MODEL_DIR, 'categorical_cols.joblib'))
+joblib.dump(chosen_threshold, os.path.join(MODEL_DIR, 'lightgbm_threshold.joblib'))
+print(f"\nSaved LightGBM model + threshold to {MODEL_DIR}/")
+print("Next: python scripts/calibrate_model.py to fit the probability calibrator.")
