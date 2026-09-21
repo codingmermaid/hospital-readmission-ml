@@ -27,9 +27,9 @@ fig, ax = plt.subplots(figsize=(8, 5.5))
 bars1 = ax.bar(x - width/2, accuracy, width, label='Accuracy (%)', color=LILAC, edgecolor='#4B4066', linewidth=1)
 bars2 = ax.bar(x + width/2, recall, width, label='Recall on at-risk patients (%)', color=TURQUOISE, edgecolor='#4B4066', linewidth=1)
 
-for bar, val in zip(bars1, accuracy):
+for bar, val in zip(bars1, accuracy, strict=True):
     ax.text(bar.get_x() + bar.get_width()/2, val + 1.5, f'{val:.1f}%', ha='center', color=TEXT, fontsize=10)
-for bar, val, color in zip(bars2, recall, [RED, TEXT, TEXT]):
+for bar, val, color in zip(bars2, recall, [RED, TEXT, TEXT], strict=True):
     ax.text(bar.get_x() + bar.get_width()/2, val + 1.5, f'{val:.1f}%', ha='center', color=color, fontsize=10,
             fontweight='bold' if val == 0 else 'normal')
 

@@ -1,7 +1,13 @@
-import pandas as pd
-import numpy as np
+import os
+import sys
 
-df = pd.read_csv('data/diabetic_data_clean.csv')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+from src.features import AGE_MIDPOINTS, MAX_DIAGNOSES_CAP, MED_COLS, categorize_diag
+from src.io import read_pipeline_csv
+
+df = read_pipeline_csv('data/diabetic_data_clean.csv')
 
 # --- 1. Combined prior utilization: inpatient + emergency + outpatient visits ---
 # Each showed individual signal in EDA; combining captures overall "high healthcare utilizer" risk
@@ -11,14 +17,10 @@ df['total_prior_visits'] = df['number_inpatient'] + df['number_emergency'] + df[
 df['had_prior_inpatient'] = (df['number_inpatient'] > 0).astype(int)
 
 # --- 3. Age as ordinal midpoint instead of string bucket (lets models use it numerically) ---
-age_map = {
-    '[0-10)': 5, '[10-20)': 15, '[20-30)': 25, '[30-40)': 35, '[40-50)': 45,
-    '[50-60)': 55, '[60-70)': 65, '[70-80)': 75, '[80-90)': 85, '[90-100)': 95
-}
-df['age_midpoint'] = df['age'].map(age_map)
+df['age_midpoint'] = df['age'].map(AGE_MIDPOINTS)
 
 # --- 4. Number of diagnoses, capped to reduce noise from rare high-tail values seen in EDA ---
-df['number_diagnoses_capped'] = df['number_diagnoses'].clip(upper=10)
+df['number_diagnoses_capped'] = df['number_diagnoses'].clip(upper=MAX_DIAGNOSES_CAP)
 
 # --- 5. Medication change flag: was diabetic medication changed during encounter? ---
 # 'change' column is Ch/No; captures whether care plan was actively adjusted
@@ -28,42 +30,12 @@ df['med_changed'] = (df['change'] == 'Ch').astype(int)
 df['on_diabetes_med'] = (df['diabetesMed'] == 'Yes').astype(int)
 
 # --- 7. Count of medications that were actually changed (up/down) across the 23 drug columns ---
-med_cols = ['metformin', 'repaglinide', 'nateglinide', 'chlorpropamide', 'glimepiride',
-            'acetohexamide', 'glipizide', 'glyburide', 'tolbutamide', 'pioglitazone',
-            'rosiglitazone', 'acarbose', 'miglitol', 'troglitazone', 'tolazamide',
-            'insulin', 'glyburide-metformin', 'glipizide-metformin',
-            'glimepiride-pioglitazone', 'metformin-rosiglitazone', 'metformin-pioglitazone']
-med_cols = [c for c in med_cols if c in df.columns]
+med_cols = [c for c in MED_COLS if c in df.columns]
 df['num_med_changes'] = (df[med_cols].isin(['Up', 'Down'])).sum(axis=1)
 
 # --- 8. Simplify diag_1 (primary diagnosis) into broad ICD-9 categories ---
-# Full ICD-9 codes have 700+ levels; group into clinically meaningful buckets
-def categorize_diag(code):
-    if code == 'Unknown' or pd.isna(code):
-        return 'Unknown'
-    try:
-        code_num = float(code)
-    except ValueError:
-        return 'Other'  # V or E codes (external causes/supplemental)
-    if 390 <= code_num <= 459 or code_num == 785:
-        return 'Circulatory'
-    elif 460 <= code_num <= 519 or code_num == 786:
-        return 'Respiratory'
-    elif 520 <= code_num <= 579 or code_num == 787:
-        return 'Digestive'
-    elif code_num == 250 or (250 <= code_num < 251):
-        return 'Diabetes'
-    elif 800 <= code_num <= 999:
-        return 'Injury'
-    elif 710 <= code_num <= 739:
-        return 'Musculoskeletal'
-    elif 580 <= code_num <= 629 or code_num == 788:
-        return 'Genitourinary'
-    elif 140 <= code_num <= 239:
-        return 'Neoplasms'
-    else:
-        return 'Other'
-
+# categorize_diag lives in src/features.py so the app and the tests use the
+# exact same bucketing rather than a second copy that can drift.
 df['diag_1_category'] = df['diag_1'].apply(categorize_diag)
 
 print("New features created:")

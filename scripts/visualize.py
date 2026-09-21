@@ -1,8 +1,13 @@
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
+import os
+import sys
 
-df = pd.read_csv('data/diabetic_data_clean.csv')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import matplotlib.pyplot as plt
+
+from src.io import read_pipeline_csv
+
+df = read_pipeline_csv('data/diabetic_data_clean.csv')
 
 # Brand palette
 LILAC = '#A78BFA'

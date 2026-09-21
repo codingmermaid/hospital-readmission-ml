@@ -1,0 +1,31 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    # scikit-learn warns when unpickling an estimator saved by another version.
+    # The committed model is a fixed artifact, so this is expected in CI.
+    "ignore::UserWarning",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = ["charts", "model"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # import sorting
+    "UP",  # pyupgrade
+    "B",   # bugbear
+]
+ignore = [
+    "E501",  # line length is handled by the formatter, not the linter
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The pipeline scripts are run top-to-bottom as reports, not imported as modules.
+# They need sys.path set up before importing from src/, which trips E402.
+"scripts/*.py" = ["E402"]
+"app.py" = ["E402"]
+"tests/conftest.py" = ["E402"]

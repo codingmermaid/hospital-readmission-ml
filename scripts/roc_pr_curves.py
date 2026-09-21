@@ -1,11 +1,16 @@
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import GroupShuffleSplit
-from sklearn.metrics import roc_curve, precision_recall_curve, auc
-import matplotlib.pyplot as plt
-import joblib
+import os
+import sys
 
-df = pd.read_csv('data/diabetic_data_features.csv')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import joblib
+import matplotlib.pyplot as plt
+from sklearn.metrics import auc, precision_recall_curve, roc_curve
+from sklearn.model_selection import GroupShuffleSplit
+
+from src.io import read_pipeline_csv
+
+df = read_pipeline_csv('data/diabetic_data_features.csv')
 
 drop_for_model = ['encounter_id', 'patient_nbr', 'readmitted', 'age', 'diag_1', 'diag_2', 'diag_3', 'number_diagnoses']
 med_cols = ['metformin', 'repaglinide', 'nateglinide', 'chlorpropamide', 'glimepiride',
